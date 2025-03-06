@@ -13,6 +13,8 @@ from charms.loki_k8s.v0.loki_push_api import LogProxyConsumer
 from charms.prometheus_k8s.v0.prometheus_scrape import MetricsEndpointProvider
 from ops import (
     CollectStatusEvent,
+    InstallEvent,
+    StartEvent,
     StatusBase,
 )
 
@@ -26,9 +28,11 @@ from literals import (
     CHARM_KEY,
     CONTAINER,
     DEPENDENCIES,
+    GROUP,
     JMX_EXPORTER_PORT,
     METRICS_RULES_DIR,
     SUBSTRATE,
+    USER,
     DebugLevel,
     Status,
     Substrates,
@@ -70,6 +74,9 @@ class ConnectCharm(TypedCharmBase[CharmConfig]):
         self.framework.observe(self.on.collect_unit_status, self._on_collect_status)
         self.framework.observe(self.on.collect_app_status, self._on_collect_status)
 
+        if self.substrate == "k8s":
+            self.framework.observe(getattr(self.on, "kafka_connect_pebble_ready"), self._on_start)
+
         self.connect = ConnectHandler(self)
         self.kafka = KafkaHandler(self)
         self.tls = TLSHandler(self)
@@ -106,13 +113,21 @@ class ConnectCharm(TypedCharmBase[CharmConfig]):
             container_name=CONTAINER,
         )
 
-    def _on_install(self, event) -> None:
+    def _on_install(self, event: InstallEvent) -> None:
         """Handler for `install` event."""
         if not self.workload.container_can_connect:
             event.defer()
             return
 
-    def _on_start(self, _) -> None:
+    def _on_start(self, event: StartEvent) -> None:
+        if not self.workload.container_can_connect:
+            event.defer()
+            return
+
+        # TODO: remove after rock release
+        self.workload.mkdir(self.workload.paths.logs_dir)
+        self.workload.exec(["chown", "-R", f"{USER}:{GROUP}", self.workload.paths.logs_dir])
+
         if not self.context.kafka_client.relation:
             self._set_status(Status.MISSING_KAFKA)
 

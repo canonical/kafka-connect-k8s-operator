@@ -54,9 +54,6 @@ class Workload(WorkloadBase):
         self.container = container
         self.paths = K8sPaths(CONFIG_DIR)
 
-        self.mkdir(self.paths.logs_dir)
-        self.exec(["chown", "-R", "kafka:kafka", self.paths.logs_dir])
-
     @override
     def start(self) -> None:
         self.container.add_layer(CHARM_KEY, self.layer, combine=True)

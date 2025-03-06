@@ -61,6 +61,10 @@ class ConnectHandler(Object):
 
     def _on_config_changed(self, event: ConfigChangedEvent) -> None:
         """Handler for `config-changed` event."""
+        if not self.workload.container_can_connect:
+            event.defer()
+            return
+
         if not self.charm.connect_manager.plugin_path_initiated:
             self.charm.connect_manager.init_plugin_path()
 
