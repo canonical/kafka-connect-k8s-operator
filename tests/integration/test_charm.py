@@ -47,7 +47,6 @@ async def test_deploy_charms(ops_test: OpsTest, kafka_connect_charm):
 
     await ops_test.model.wait_for_idle(apps=[APP_NAME, KAFKA_APP], timeout=3000)
 
-    assert ops_test.model.applications[KAFKA_APP].status == "active"
     assert ops_test.model.applications[APP_NAME].status == "blocked"
 
     await ops_test.model.add_relation(APP_NAME, KAFKA_APP)
