@@ -124,10 +124,6 @@ class ConnectCharm(TypedCharmBase[CharmConfig]):
             event.defer()
             return
 
-        # TODO: remove after rock release
-        self.workload.mkdir(self.workload.paths.logs_dir)
-        self.workload.exec(["chown", "-R", f"{USER}:{GROUP}", self.workload.paths.logs_dir])
-
         if not self.context.kafka_client.relation:
             self._set_status(Status.MISSING_KAFKA)
 
