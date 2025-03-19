@@ -62,6 +62,12 @@ def patched_remove():
 
 
 @pytest.fixture(autouse=True)
+def patched_ls():
+    with patch("workload.Workload.ls") as patched_ls:
+        yield patched_ls
+
+
+@pytest.fixture(autouse=True)
 def active_workload():
     with patch("workload.Workload.installed") as active_workload:
         yield active_workload

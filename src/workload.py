@@ -12,10 +12,11 @@ from contextlib import closing
 from typing import BinaryIO, Iterable
 
 from ops import Container, pebble
+from ops.pebble import FileType
 from tenacity import retry, retry_if_result, stop_after_attempt, wait_fixed
 from typing_extensions import override
 
-from core.workload import Paths, WorkloadBase
+from core.workload import DirEntry, Paths, WorkloadBase
 from literals import (
     CHARM_KEY,
     CONFIG_DIR,
@@ -138,7 +139,7 @@ class Workload(WorkloadBase):
         return self.exec(command=command.split(), env=parsed_opts or None)
 
     @override
-    def mkdir(self, path: str):
+    def mkdir(self, path: str) -> None:
         try:
             self.exec(["mkdir", path])
         except pebble.ExecError as e:
@@ -147,11 +148,11 @@ class Workload(WorkloadBase):
             raise e
 
     @override
-    def rmdir(self, path: str):
+    def rmdir(self, path: str) -> None:
         self.exec(["rm", "-r", path])
 
     @override
-    def remove(self, path: str, glob: bool = False):
+    def remove(self, path: str, glob: bool = False) -> None:
         if not glob:
             self.exec(["rm", path])
             return
@@ -160,6 +161,25 @@ class Workload(WorkloadBase):
         for file in self.container.list_files(dirname):
             if fnmatch.fnmatch(file.path, path):
                 self.exec(["rm", "-rf", file.path])
+
+    @override
+    def dir_exists(self, path: str) -> bool:
+        """Checks whether a directory exists at provided path on the workload."""
+        if not self.container_can_connect:
+            return False
+
+        return self.container.isdir(path)
+
+    @override
+    def ls(self, path: str) -> list[DirEntry]:
+        """Returns a directory listing of provided path on the workload."""
+        if not self.container_can_connect:
+            return []
+
+        return [
+            DirEntry(name=f.name, is_dir=(f.type == FileType.DIRECTORY))
+            for f in self.container.list_files(path)
+        ]
 
     @override
     def check_socket(self, host: str, port: int) -> bool:
