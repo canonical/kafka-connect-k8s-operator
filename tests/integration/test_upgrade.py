@@ -36,6 +36,7 @@ async def test_in_place_upgrade(ops_test: OpsTest, kafka_connect_charm):
             application_name=APP_NAME,
             num_units=3,
             series="jammy",
+            trust=True,
         ),
         ops_test.model.deploy(
             KAFKA_APP,
