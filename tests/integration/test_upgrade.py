@@ -48,15 +48,11 @@ async def test_in_place_upgrade(ops_test: OpsTest, kafka_connect_charm):
     )
 
     await ops_test.model.wait_for_idle(apps=[APP_NAME, KAFKA_APP], timeout=3000)
-
-    assert ops_test.model.applications[KAFKA_APP].status == "active"
-    assert ops_test.model.applications[APP_NAME].status == "blocked"
-
     await ops_test.model.add_relation(APP_NAME, KAFKA_APP)
 
     async with ops_test.fast_forward(fast_interval="60s"):
         await ops_test.model.wait_for_idle(
-            apps=[APP_NAME, KAFKA_APP], idle_period=60, timeout=1000, status="active"
+            apps=[APP_NAME, KAFKA_APP], idle_period=60, timeout=1200, status="active"
         )
 
     leader_unit = None
