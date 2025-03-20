@@ -63,7 +63,7 @@ class ConnectHandler(Object):
             event.defer()
             return
 
-        self.charm.orchestrate()
+        self.charm.reconcile()
 
         if not self.context.ready:
             event.defer()

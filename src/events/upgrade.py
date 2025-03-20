@@ -63,7 +63,7 @@ class ConnectUpgrade(DataUpgrade):
         # needed to run before setting config
         self.apply_backwards_compatibility_fixes(event)
 
-        self.charm.orchestrate()
+        self.charm.reconcile()
 
         # start workload service
         self.charm.workload.start()

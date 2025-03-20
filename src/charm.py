@@ -146,7 +146,7 @@ class ConnectCharm(TypedCharmBase[CharmConfig]):
         for status in self.pending_inactive_statuses + [workload_status]:
             event.add_status(status.value.status)
 
-    def orchestrate(self) -> None:
+    def reconcile(self) -> None:
         """Substrate-agnostic method for startup/restarts/config-changes which orchestrates workload, managers and handlers.
 
         This method is safe to call and only triggers a workload restart if necessary.
