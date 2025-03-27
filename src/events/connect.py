@@ -4,18 +4,16 @@
 
 """Event Handler for Kafka Connect related events."""
 
-import datetime
 import logging
 from typing import TYPE_CHECKING
 
-from ops import ModelError
 from ops.charm import (
     ConfigChangedEvent,
 )
 from ops.framework import EventBase, Object
 
 from events.provider import ConnectProvider
-from literals import PEER_REL, PLUGIN_RESOURCE_KEY, Status
+from literals import PEER_REL, Status
 from managers.connect import PluginDownloadFailedError
 
 if TYPE_CHECKING:
@@ -65,47 +63,11 @@ class ConnectHandler(Object):
             event.defer()
             return
 
-        if not self.charm.connect_manager.plugin_path_initiated:
-            self.charm.connect_manager.init_plugin_path()
-
-        try:
-            resource_path = self.model.resources.fetch(PLUGIN_RESOURCE_KEY)
-            self.charm.connect_manager.load_plugin(resource_path)
-        except RuntimeError:
-            logger.error(f"Resource {PLUGIN_RESOURCE_KEY} not defined in the charm build.")
-        except (NameError, ModelError):
-            logger.debug(
-                f"Resource {PLUGIN_RESOURCE_KEY} not found or could not be downloaded, skipping plugin loading."
-            )
-
-        self.update_plugins()
-        self.update_clients_data()
-
-        if self.context.peer_workers.tls_enabled and self.charm.tls_manager.sans_change_detected:
-            self.charm.tls.certificates.on.certificate_expiring.emit(
-                certificate=self.unit_tls_context.certificate,
-                expiry=datetime.datetime.now().isoformat(),
-            )
-            self.charm.context.worker_unit.update(
-                {self.unit_tls_context.CERT: ""}
-            )  # ensures only single requested new certs, will be replaced on new certificate-available event
-
-            return  # config-changed would be eventually fired on certificate-available, so no need to defer.
-
-        current_config = set(self.charm.workload.read(self.workload.paths.worker_properties))
-        diff = set(self.charm.config_manager.properties) ^ current_config
-
-        if not any([diff, self.context.worker_unit.should_restart]):
-            return
+        self.charm.reconcile()
 
         if not self.context.ready:
-            self.charm._set_status(self.context.status)
             event.defer()
             return
-
-        self.enable_auth()
-        self.charm.config_manager.configure()
-        self.charm.connect_manager.restart_worker()
 
         self._update_status(event)
 
