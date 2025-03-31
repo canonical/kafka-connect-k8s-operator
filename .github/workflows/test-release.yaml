@@ -4,9 +4,6 @@ on:
   pull_request:
   workflow_call:
     inputs:
-      platforms:
-        default: ubuntu@22.04:amd64
-        type: string
       cache:
         description: Whether to use cache for faster builds
         default: false
@@ -57,17 +54,12 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - name: Get workflow version
-        id: workflow-version
-        uses: canonical/get-workflow-version-action@v1
-        with:
-          repository-name: canonical/data-platform-workflows
-          file-name: build_charm.yaml
-          github-token: ${{ secrets.GITHUB_TOKEN }}
       - name: Install CLI
-        run: pipx install git+https://github.com/canonical/data-platform-workflows@'${{ steps.workflow-version.outputs.sha }}'#subdirectory=python/cli
+        run: pipx install git+https://github.com/canonical/data-platform-workflows@'v29.3.0-rc.1'#subdirectory=python/cli
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          repository: canonical/template-connect-integrator
       - name: Collect charm platforms to build from charmcraft.yaml
         id: collect
         run: collect-charm-platforms --directory=.
