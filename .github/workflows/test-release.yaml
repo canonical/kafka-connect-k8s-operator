@@ -154,7 +154,7 @@ jobs:
         run: wget https://github.com/Aiven-Open/jdbc-connector-for-apache-kafka/releases/download/v6.10.0/jdbc-connector-for-apache-kafka-6.10.0.tar -O ./plugin.tar
       - name: Upload & release charm
         id: release
-        run: release-charm --directory=./build --channel=latest/edge --create-tags=false --file-resource=./plugin.tar
+        run: release-charm --directory=. --channel=latest/edge --create-tags=false --file-resource=./plugin.tar
         env:
           CHARMCRAFT_AUTH: ${{ secrets.CHARMHUB_TOKEN }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
