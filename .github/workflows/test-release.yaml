@@ -76,13 +76,6 @@ jobs:
     runs-on: ${{ matrix.platform.runner }}
     timeout-minutes: 120
     steps:
-      - name: Get workflow version
-        id: workflow-version
-        uses: canonical/get-workflow-version-action@v1
-        with:
-          repository-name: canonical/data-platform-workflows
-          file-name: build_charm.yaml
-          github-token: ${{ secrets.GITHUB_TOKEN }}
       - name: Install CLI
         run: pipx install git+https://github.com/canonical/data-platform-workflows@'29.3.0-rc.1'#subdirectory=python/cli
       - name: Parse charmcraft version inputs
