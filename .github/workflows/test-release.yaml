@@ -108,6 +108,10 @@ jobs:
           sudo snap install charmcraft --classic ${{ steps.charmcraft-snap-version.outputs.install_flag }}
           pipx install charmcraftcache
       - run: snap list
+      - name: Install tox & poetry
+        run: |
+          pipx install tox
+          pipx install poetry
       - name: Make
         run: |
           make build \
