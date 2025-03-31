@@ -121,8 +121,9 @@ jobs:
             DATA_INTERFACE=mysql_client
       - name: Pack charm
         id: pack
-        working-directory: ${{ inputs.path-to-charm-directory }}
         run: |
+          cd build
+          ls -lh
           if '${{ inputs.cache }}'
           then
             sudo --user "$USER" --preserve-env --preserve-env=PATH -- env -- charmcraftcache pack -v --platform='${{ matrix.platform.name }}'
