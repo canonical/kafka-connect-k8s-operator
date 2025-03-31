@@ -153,7 +153,7 @@ jobs:
       - name: Download plugin
         run: wget https://github.com/Aiven-Open/jdbc-connector-for-apache-kafka/releases/download/v6.10.0/jdbc-connector-for-apache-kafka-6.10.0.tar -O build/plugin.tar
       - name: Register
-        run: charmcraft register mysql-source-integrator
+        run: charmcraft register mysql-connect-integrator
         continue-on-error: true
         env:
           CHARMCRAFT_AUTH: ${{ secrets.CHARMHUB_TOKEN }}
