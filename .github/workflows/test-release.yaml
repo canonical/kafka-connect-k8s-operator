@@ -156,7 +156,7 @@ jobs:
         id: release
         run: release-charm --directory=./build --channel=latest/edge --create-tags=false --file-resource=./plugin.tar
         env:
-          CHARMCRAFT_AUTH: ${{ secrets.charmhub-token }}
+          CHARMCRAFT_AUTH: ${{ secrets.CHARMHUB_TOKEN }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Charmcraft logs
         if: ${{ success() || (failure() && steps.release.outcome == 'failure') }}
