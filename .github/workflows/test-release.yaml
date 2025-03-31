@@ -150,3 +150,14 @@ jobs:
             build/*.charm
             .empty
           if-no-files-found: error
+      - name: Download plugin
+        run: wget https://github.com/Aiven-Open/jdbc-connector-for-apache-kafka/releases/download/v6.10.0/jdbc-connector-for-apache-kafka-6.10.0.tar -O ./plugin.tar
+      - name: Upload & release charm
+        id: release
+        run: release-charm --directory=./build --channel=latest/edge --create-tags=false --file-resource=./plugin.tar
+        env:
+          CHARMCRAFT_AUTH: ${{ secrets.charmhub-token }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Charmcraft logs
+        if: ${{ success() || (failure() && steps.release.outcome == 'failure') }}
+        run: cat ~/.local/state/charmcraft/log/*
