@@ -1,0 +1,41 @@
+name: Tests
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+on:
+  pull_request:
+  workflow_call:
+    outputs:
+      artifact-prefix:
+        description: build_charm.yaml `artifact-prefix` output
+        value: ${{ jobs.build.outputs.artifact-prefix }}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          repository: 'canonical/template-connect-integrator'
+      - name: Setup environment
+        uses: charmed-kubernetes/actions-operator@main
+        with:
+          provider: lxd
+          juju-channel: 3.6/stable
+          bootstrap-options: "--agent-version 3.6.1"
+      - name: Make
+        run: |
+          make build \
+            NAME=mysql-connect-integrator \
+            BUILD_DIRECTORY=build \
+            IMPL=mysql \
+            DATA_INTERFACE=mysql_client
+      - name: Build charms
+        uses: canonical/data-platform-workflows/.github/workflows/build_charm.yaml@v29.0.0
+        with:
+          path-to-charm-directory: ./build
+          cache: false  # TODO: fix after being added to ccc
