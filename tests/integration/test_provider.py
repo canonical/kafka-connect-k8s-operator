@@ -66,11 +66,13 @@ async def test_deploy_app_and_integrator(ops_test: OpsTest, kafka_connect_charm,
 
     async with ops_test.fast_forward(fast_interval="60s"):
         await ops_test.model.wait_for_idle(
-            apps=[APP_NAME, KAFKA_APP, INTEGRATOR_APP],
+            apps=[APP_NAME, KAFKA_APP],
             idle_period=60,
             timeout=1800,
             status="active",
         )
+
+    assert ops_test.model.applications[INTEGRATOR_APP].status == "blocked"
 
 
 @pytest.mark.abort_on_fail
