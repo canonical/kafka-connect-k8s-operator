@@ -63,6 +63,7 @@ jobs:
           - integration-tls
           - integration-plugins
           - integration-provider
+          - integration-secrets
           - integration-upgrade
     name: ${{ matrix.tox-environments }}
     needs:

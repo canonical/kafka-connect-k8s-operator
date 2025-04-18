@@ -49,10 +49,10 @@ class Workload(WorkloadBase):
     """Wrapper for performing common operations specific to the Kafka Connect Container."""
 
     service: str = SERVICE_NAME
+    paths = K8sPaths(CONFIG_DIR)
 
     def __init__(self, container: Container, profile: str = "production") -> None:
         self.container = container
-        self.paths = K8sPaths(CONFIG_DIR)
         self.log_sensitive_output = profile == "testing"
 
     @override

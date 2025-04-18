@@ -53,6 +53,10 @@ def workload_with_io(monkeypatch, tmp_path_factory):
     monkeypatch.setattr(
         "workload.Workload.write", lambda _, content, path: open(path, "w").write(content)
     )
+    monkeypatch.setattr(
+        "workload.Workload.read",
+        lambda _, path: open(path, "r").read().split("\n") if Path(path).exists() else [],
+    )
     monkeypatch.setattr("workload.Workload.paths", paths)
     yield
 
