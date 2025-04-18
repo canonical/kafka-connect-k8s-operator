@@ -8,9 +8,11 @@ import logging
 from typing import TYPE_CHECKING
 
 from charms.data_platform_libs.v0.data_interfaces import (
+    PLUGIN_URL_NOT_REQUIRED,
     IntegrationRequestedEvent,
     KafkaConnectProviderEventHandlers,
 )
+from charms.kafka_connect.v0.integrator import TaskStatus
 from ops.charm import (
     RelationBrokenEvent,
     RelationChangedEvent,
@@ -63,13 +65,14 @@ class ConnectProvider(Object):
             event.defer()
             return
 
-        try:
-            self.charm.connect_manager.load_plugin_from_url(
-                client.plugin_url, path_prefix=client.username
-            )
-        except PluginDownloadFailedError as e:
-            logger.error(f"Unable to fetch the plugin: {e}")
-            return
+        if client.plugin_url != PLUGIN_URL_NOT_REQUIRED:
+            try:
+                self.charm.connect_manager.load_plugin_from_url(
+                    client.plugin_url, path_prefix=client.username
+                )
+            except PluginDownloadFailedError as e:
+                logger.error(f"Unable to fetch the plugin: {e}")
+                return
 
         if not self.charm.unit.is_leader():
             return
@@ -111,6 +114,13 @@ class ConnectProvider(Object):
         username = f"relation-{event.relation.id}"
         self.charm.auth_manager.remove_user(username)
         self.charm.connect_manager.remove_plugin(path_prefix=username)
+
+        if self.charm.unit.is_leader():
+            self.charm.connect_manager.delete_connector(event.relation.id)
+
+        if self.charm.connect_manager.connector_status(event.relation.id) == TaskStatus.RUNNING:
+            event.defer()
+            return
 
         self.context.worker_unit.should_restart = True
         self.charm.on.config_changed.emit()

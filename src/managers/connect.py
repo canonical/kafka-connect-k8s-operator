@@ -10,8 +10,10 @@ import re
 import tempfile
 from pathlib import Path
 from subprocess import CalledProcessError
+from typing import Pattern
 
 import requests
+from charms.kafka_connect.v0.integrator import TaskStatus
 from requests.auth import HTTPBasicAuth
 from tenacity import (
     retry,
@@ -25,7 +27,7 @@ from tenacity import (
 
 from core.models import Context
 from core.workload import WorkloadBase
-from literals import GROUP, SUBSTRATE, USER
+from literals import EMPTY_PLUGIN_CHECKSUM, GROUP, SUBSTRATE, USER
 
 logger = logging.getLogger(__name__)
 
@@ -67,6 +69,66 @@ class ConnectManager:
             if match := re.search(r"relation-[0-9]+", plugin):
                 cache.add(match.group())
         return cache
+
+    @property
+    def connectors(self) -> dict[str, TaskStatus]:
+        """Returns a mapping of connector names to their status."""
+        if not self.health_check():
+            return {}
+
+        resp = self._request("GET", "/connectors?expand=status").json()
+        # response schema: {connector-name: {status: {connector: {state: STATE}...}...}...}
+        return {
+            k: TaskStatus(v.get("status", {}).get("connector", {}).get("state", "UNKNOWN"))
+            for k, v in resp.items()
+        }
+
+    @staticmethod
+    def _managed_connector_regex(relation_id: int) -> Pattern:
+        """Returns a complied regex pattern matching managed connector names for given `relation_id`.
+
+        Managed connector names should adhere to `.+{RELATION_ID}_{MODEL_UUID}$` regex pattern.
+        """
+        return re.compile(".+?r" + str(relation_id) + "_[0-9a-f]{32}$")
+
+    def _request(
+        self,
+        method: str = "GET",
+        api: str = "",
+        verbose: bool = True,
+        **kwargs,
+    ) -> requests.Response:
+        """Makes a request to Kafka Connect REST endpoint and returns the response.
+
+        Args:
+            method (str, optional): HTTP method. Defaults to "GET".
+            api (str, optional): Specific Kafka Connect API, e.g. "connector-plugins" or "connectors". Defaults to "".
+            verbose (bool, optional): Whether should enable verbose logging or not. Defaults to True.
+            kwargs: Keyword arguments which will be passed to `requests.request` method.
+
+        Raises:
+            ConnectApiError: If the REST API call is unsuccessful.
+
+        Returns:
+            requests.Response: Response object.
+        """
+        auth = HTTPBasicAuth(
+            self.context.peer_workers.ADMIN_USERNAME, self.context.peer_workers.admin_password
+        )
+
+        url = f"{self.context.rest_uri}/{api}"
+
+        try:
+            response = requests.request(
+                method, url, verify=False, auth=auth, timeout=self.REQUEST_TIMEOUT, **kwargs
+            )
+        except Exception as e:
+            raise Exception(f"Connect API call /{api} failed: {e}")
+
+        if verbose:
+            logging.debug(f"{method} - {url}: {response.content}")
+
+        return response
 
     def _plugin_checksum(self, plugin_path: Path) -> str:
         """Calculates checksum of a plugin, currently uses SHA-256 algorithm."""
@@ -123,6 +185,10 @@ class ConnectManager:
 
     def load_plugin(self, resource_path: Path, path_prefix: str = "") -> None:
         """Loads a plugin from a given `resource_path` to the `PLUGIN_PATH` folder, skips if previously loaded."""
+        if not resource_path.exists():
+            logger.info(f"Plugin not yet loaded to {resource_path.name}.")
+            return
+
         if SUBSTRATE == "k8s":
             # we should push the plugin to kafka connect container first.
             tmp_dir = tempfile.mkdtemp()
@@ -137,10 +203,7 @@ class ConnectManager:
         # the checksum here corresponds to a sha256sum of an empty tar files created using --files-from /dev/null
         # this is what is loaded by default as the connect-plugin resource in Charmhub
         # as Charmhub won't allow charms without a resource
-        if (
-            self._plugin_checksum(resource_path)
-            == "84ff92691f909a05b224e1c56abb4864f01b4f8e3c854e4bb4c7baf1d3f6d652"
-        ):
+        if self._plugin_checksum(resource_path) == EMPTY_PLUGIN_CHECKSUM:
             logger.debug("Plugin is empty, skipping...")
             return
 
@@ -163,8 +226,10 @@ class ConnectManager:
                 path = Path(tmp_dir) / "plugin.tar"
                 self._download_plugin(plugin_url, f"{path}")
                 self.load_plugin(path, path_prefix=path_prefix)
+                logger.debug(f"Plugin {plugin_url} loaded successfully.")
         except CalledProcessError as e:
             if "File exists" in e.stderr:
+                logger.debug("Plugin already exists.")
                 return
         except Exception as e:
             raise PluginDownloadFailedError(e)
@@ -177,12 +242,29 @@ class ConnectManager:
 
     def ping_connect_api(self) -> requests.Response:
         """Makes a GET request to the unit's Connect API Endpoint and returns the response."""
-        auth = HTTPBasicAuth(
-            self.context.peer_workers.ADMIN_USERNAME, self.context.peer_workers.admin_password
-        )
-        return requests.get(
-            self.context.rest_uri, timeout=self.REQUEST_TIMEOUT, auth=auth, verify=False
-        )
+        return self._request("GET", "/")
+
+    def connector_status(self, relation_id: int) -> TaskStatus:
+        """Returns the managed connector status for given `relation_id`."""
+        for connector, status in self.connectors.items():
+            if re.match(self._managed_connector_regex(relation_id), connector):
+                return status
+
+        return TaskStatus.UNKNOWN
+
+    def delete_connector(self, relation_id: int) -> None:
+        """Deletes the managed connector instance for given `relation_id`."""
+        for connector, _ in self.connectors.items():
+            if not re.match(self._managed_connector_regex(relation_id), connector):
+                continue
+
+            resp = self._request("DELETE", f"connectors/{connector}")
+
+            if resp.status_code == 204:
+                logger.debug(f"Successfully deleted connector for relation ID={relation_id}.")
+            else:
+                logger.error(f"Unable to delete connector, details: {resp.content}")
+                continue
 
     @retry(
         wait=wait_fixed(3),
@@ -207,5 +289,4 @@ class ConnectManager:
     def restart_worker(self) -> None:
         """Attempts to restart the connect worker."""
         logger.info("Restarting worker service.")
-        self.context.worker_unit.should_restart = False
         self.workload.restart()

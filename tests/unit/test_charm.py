@@ -8,10 +8,10 @@ from typing import cast
 from unittest.mock import MagicMock, patch
 
 import pytest
-from ops.testing import Context, PeerRelation, Relation, State
+from ops.testing import Context, Relation, State
 from src.charm import ConnectCharm
 from src.core.models import PeerWorkersContext
-from src.literals import KAFKA_CLIENT_REL, PEER_REL, SUBSTRATE, Status
+from src.literals import KAFKA_CLIENT_REL, SUBSTRATE, Status
 
 logger = logging.getLogger(__name__)
 
@@ -93,7 +93,7 @@ def test_kafka_client_relation_change_triggers_restart(
     """Checks change in `kafka-client` relation configuration triggers a restart."""
     # Given
     kafka_rel = Relation(KAFKA_CLIENT_REL, KAFKA_CLIENT_REL, remote_app_data=kafka_client_rel)
-    state_in = dataclasses.replace(base_state, relations=[kafka_rel])
+    state_in = dataclasses.replace(base_state, relations=[*base_state.relations, kafka_rel])
 
     # When
     with (patch("workload.Workload.read"), patch("workload.Workload.restart") as _restart):
@@ -123,13 +123,16 @@ def test_kafka_client_relation_broken(
 
 @pytest.mark.parametrize("admin_password", ["", "password"])
 def test_enable_auth(
-    ctx: Context, base_state: State, kafka_client_rel: dict, active_service, admin_password
+    ctx: Context,
+    base_state: State,
+    kafka_client_rel: dict,
+    active_service,
+    admin_password,
 ) -> None:
     """Checks `enable_auth` functionality on service startup."""
     # Given
     kafka_rel = Relation(KAFKA_CLIENT_REL, KAFKA_CLIENT_REL, remote_app_data=kafka_client_rel)
-    peer_rel = PeerRelation(PEER_REL, PEER_REL)
-    state_in = dataclasses.replace(base_state, relations=[kafka_rel, peer_rel])
+    state_in = dataclasses.replace(base_state, relations=[*base_state.relations, kafka_rel])
     auth_manager_mock = MagicMock()
 
     # When

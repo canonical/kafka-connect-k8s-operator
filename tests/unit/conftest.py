@@ -4,73 +4,57 @@
 
 from collections import defaultdict
 from pathlib import Path
-from unittest.mock import Mock, patch
+from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 import yaml
+from ops import EventBase
 from ops.pebble import ServiceStatus
-from ops.testing import Container, Context, Resource, State
+from ops.testing import Container, Context, PeerRelation, Resource, State
 from src.charm import ConnectCharm
-from src.literals import CONTAINER, PLUGIN_RESOURCE_KEY, SERVICE_NAME, SNAP_NAME, SUBSTRATE
+from src.core.workload import Paths
+from src.literals import (
+    CONTAINER,
+    PEER_REL,
+    PLUGIN_RESOURCE_KEY,
+    SERVICE_NAME,
+    SNAP_NAME,
+    SUBSTRATE,
+)
 
 CONFIG = yaml.safe_load(Path("./config.yaml").read_text())
 ACTIONS = yaml.safe_load(Path("./actions.yaml").read_text())
 METADATA = yaml.safe_load(Path("./metadata.yaml").read_text())
 
 
-@pytest.fixture()
-def base_state():
-    if SUBSTRATE == "k8s":
-        state = State(
-            leader=True,
-            containers=[
-                Container(
-                    name=CONTAINER,
-                    can_connect=True,
-                    service_statuses={SERVICE_NAME: ServiceStatus.ACTIVE},
-                )
-            ],
-        )
-    else:
-        state = State(leader=True)
-
-    return state
+@pytest.fixture(autouse=True)
+def workload(monkeypatch):
+    """Workload with completely mocked functionality."""
+    monkeypatch.setattr("workload.Workload.exec", Mock())
+    monkeypatch.setattr("workload.Workload.installed", True)
+    monkeypatch.setattr("workload.Workload.write", Mock())
+    monkeypatch.setattr("workload.Workload.remove", Mock())
+    monkeypatch.setattr("workload.Workload.ls", Mock(return_value=[]))
+    yield
 
 
 @pytest.fixture()
-def ctx() -> Context:
-    ctx = Context(ConnectCharm, meta=METADATA, config=CONFIG, actions=ACTIONS, unit_id=0)
-    return ctx
+def workload_with_io(monkeypatch, tmp_path_factory):
+    """Workload with simulated read/write functionality using temp paths."""
 
+    class TmpPaths(Paths):
+        logs_dir = tmp_path_factory.mktemp("logs")
+        snap_dir = tmp_path_factory.mktemp("snap")
+        env = tmp_path_factory.mktemp("etc") / "environment"
+        plugins = tmp_path_factory.mktemp("plugins")
 
-@pytest.fixture(autouse=True)
-def patched_workload_write():
-    with patch("workload.Workload.write") as workload_write:
-        yield workload_write
+    paths = TmpPaths(config_dir=tmp_path_factory.mktemp("config"))
 
-
-@pytest.fixture(autouse=True)
-def patched_exec():
-    with patch("workload.Workload.exec") as patched_exec:
-        yield patched_exec
-
-
-@pytest.fixture(autouse=True)
-def patched_remove():
-    with patch("workload.Workload.remove") as patched_remove:
-        yield patched_remove
-
-
-@pytest.fixture(autouse=True)
-def patched_ls():
-    with patch("workload.Workload.ls") as patched_ls:
-        yield patched_ls
-
-
-@pytest.fixture(autouse=True)
-def active_workload():
-    with patch("workload.Workload.installed") as active_workload:
-        yield active_workload
+    monkeypatch.setattr(
+        "workload.Workload.write", lambda _, content, path: open(path, "w").write(content)
+    )
+    monkeypatch.setattr("workload.Workload.paths", paths)
+    yield
 
 
 @pytest.fixture(autouse=True)
@@ -106,9 +90,63 @@ def plugin_resource():
     return Resource(name=PLUGIN_RESOURCE_KEY, path="./tests/unit/resources/FakePlugin.tar")
 
 
+class MockAcquireLock(EventBase):
+    def __init__(self, handle, callback_override: str | None = None):
+        super().__init__(handle)
+        self.callback_override = "_restart_callback"
+
+    def snapshot(self):
+        """Snapshot of lock event."""
+        return {"callback_override": self.callback_override}
+
+    def restore(self, snapshot):
+        """Restores lock event."""
+        self.callback_override = snapshot["callback_override"]
+
+
+@pytest.fixture
+def restart_rel(monkeypatch):
+    monkeypatch.setattr("charms.rolling_ops.v0.rollingops.AcquireLock", MockAcquireLock)
+
+    return PeerRelation("restart", "rolling_op")
+
+
 @pytest.fixture(scope="module")
 def active_service():
-    with patch(
-        "managers.connect.ConnectManager.health_check", return_value=True
-    ) as patched_service:
+    mock_response = MagicMock()
+    mock_response.json.return_value = {}
+
+    with (
+        patch(
+            "managers.connect.ConnectManager.health_check", return_value=True
+        ) as patched_service,
+        patch("managers.connect.ConnectManager._request", return_value=mock_response),
+    ):
         yield patched_service
+
+
+@pytest.fixture()
+def base_state(restart_rel):
+    peer_rel = PeerRelation(PEER_REL, PEER_REL)
+    if SUBSTRATE == "k8s":
+        state = State(
+            leader=True,
+            containers=[
+                Container(
+                    name=CONTAINER,
+                    can_connect=True,
+                    service_statuses={SERVICE_NAME: ServiceStatus.ACTIVE},
+                )
+            ],
+            relations=[peer_rel, restart_rel],
+        )
+    else:
+        state = State(leader=True)
+
+    return state
+
+
+@pytest.fixture()
+def ctx() -> Context:
+    ctx = Context(ConnectCharm, meta=METADATA, config=CONFIG, actions=ACTIONS, unit_id=0)
+    return ctx

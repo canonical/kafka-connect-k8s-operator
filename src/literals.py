@@ -39,6 +39,7 @@ PLUGIN_PATH = "/var/lib/connect/plugins/"
 CONFIG_DIR = "/etc/connect"
 JMX_EXPORTER_PORT = 9100
 METRICS_RULES_DIR = "./src/alert_rules/prometheus"
+EMPTY_PLUGIN_CHECKSUM = "84ff92691f909a05b224e1c56abb4864f01b4f8e3c854e4bb4c7baf1d3f6d652"
 
 TOPICS = {"offset": "connect-offset", "config": "connect-config", "status": "connect-status"}
 REPLICATION_FACTOR = -1  # -1 uses broker's default replication factor
@@ -49,10 +50,8 @@ PEER_REL = "worker"
 CLIENT_REL = "connect-client"
 TLS_REL = "certificates"
 
-# TODO: this should be set using `profile` config option in the future
-LOG_SENSITIVE_OUTPUT = True  # set False for production mode & builds
-
-DebugLevel = Literal["DEBUG", "INFO", "WARNING", "ERROR"]
+CharmProfile = Literal["testing", "production"]
+LogLevel = Literal["DEBUG", "INFO", "WARNING", "ERROR"]
 DatabagScope = Literal["unit", "app"]
 Substrates = Literal["vm", "k8s"]
 ClientModes = Literal["worker", "producer", "consumer"]
@@ -65,7 +64,7 @@ class StatusLevel:
     """Status object helper."""
 
     status: StatusBase
-    log_level: DebugLevel
+    log_level: LogLevel
 
 
 class Status(Enum):

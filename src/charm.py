@@ -12,8 +12,10 @@ from charms.data_platform_libs.v0.data_models import TypedCharmBase
 from charms.grafana_k8s.v0.grafana_dashboard import GrafanaDashboardProvider
 from charms.loki_k8s.v0.loki_push_api import LogProxyConsumer
 from charms.prometheus_k8s.v0.prometheus_scrape import MetricsEndpointProvider
+from charms.rolling_ops.v0.rollingops import RollingOpsManager
 from ops import (
     CollectStatusEvent,
+    EventBase,
     InstallEvent,
     ModelError,
     StartEvent,
@@ -26,6 +28,7 @@ from events.connect import ConnectHandler
 from events.kafka import KafkaHandler
 from events.tls import TLSHandler
 from events.upgrade import ConnectDependencyModel, ConnectUpgrade
+from events.user_secrets import SecretsHandler
 from literals import (
     CHARM_KEY,
     CONTAINER,
@@ -34,7 +37,7 @@ from literals import (
     METRICS_RULES_DIR,
     PLUGIN_RESOURCE_KEY,
     SUBSTRATE,
-    DebugLevel,
+    LogLevel,
     Status,
     Substrates,
 )
@@ -58,7 +61,9 @@ class ConnectCharm(TypedCharmBase[CharmConfig]):
         self.substrate: Substrates = SUBSTRATE
         self.pending_inactive_statuses: list[Status] = []
 
-        self.workload = Workload(container=self.unit.get_container(CONTAINER))
+        self.workload = Workload(
+            container=self.unit.get_container(CONTAINER), profile=self.config.profile
+        )
         self.context = Context(self, substrate=SUBSTRATE)
         self.auth_manager = AuthManager(
             context=self.context, workload=self.workload, store_path=self.workload.paths.passwords
@@ -88,6 +93,10 @@ class ConnectCharm(TypedCharmBase[CharmConfig]):
                 **DEPENDENCIES  # pyright: ignore[reportArgumentType]
             ),
         )
+
+        self.user_secrets = SecretsHandler(self)
+
+        self.restart = RollingOpsManager(self, relation="restart", callback=self._restart_callback)
 
         self.metrics_endpoint = MetricsEndpointProvider(
             self,
@@ -135,7 +144,7 @@ class ConnectCharm(TypedCharmBase[CharmConfig]):
     def _set_status(self, key: Status) -> None:
         """Sets charm status."""
         status: StatusBase = key.value.status
-        log_level: DebugLevel = key.value.log_level
+        log_level: LogLevel = key.value.log_level
 
         getattr(logger, log_level.lower())(status.message)
         self.pending_inactive_statuses.append(key)
@@ -145,6 +154,19 @@ class ConnectCharm(TypedCharmBase[CharmConfig]):
         workload_status = Status.INSTALLING if not self.workload.installed else self.context.status
         for status in self.pending_inactive_statuses + [workload_status]:
             event.add_status(status.value.status)
+
+    def _restart_callback(self, event: EventBase) -> None:
+        """Handler for `rolling_ops` restart events."""
+        if not self.context.ready or not self.context.worker_unit.should_restart:
+            return
+
+        self.connect_manager.restart_worker()
+
+        for _ in range(4):
+            # shouldn't take longer than a minute
+            if self.connect_manager.health_check():
+                self.context.worker_unit.should_restart = False
+                return
 
     def reconcile(self) -> None:
         """Substrate-agnostic method for startup/restarts/config-changes which orchestrates workload, managers and handlers.
@@ -183,7 +205,10 @@ class ConnectCharm(TypedCharmBase[CharmConfig]):
         current_config = set(self.workload.read(self.workload.paths.worker_properties))
         diff = set(self.config_manager.properties) ^ current_config
 
-        if not any([diff, self.context.worker_unit.should_restart]):
+        if diff:
+            self.context.worker_unit.should_restart = True
+
+        if not self.context.worker_unit.should_restart:
             return
 
         if not self.context.ready:
@@ -193,7 +218,8 @@ class ConnectCharm(TypedCharmBase[CharmConfig]):
         self.connect.enable_auth()
         self.tls_manager.configure()
         self.config_manager.configure()
-        self.connect_manager.restart_worker()
+
+        self.on[f"{self.restart.name}"].acquire_lock.emit()
 
 
 if __name__ == "__main__":
