@@ -5,7 +5,7 @@ display-name: Apache Kafka Connect - K8s
 description: |
   Description
 summary: Charmed Apache Kafka Connect Operator - K8s
-docs: https://discourse.charmhub.io/t/charmed-kafka-documentation/10288
+docs: https://discourse.charmhub.io/t/charmed-apache-kafka-k8s-documentation/10296
 source: https://github.com/canonical/kafka-connect-k8s-operator
 issues: https://github.com/canonical/kafka-connect-k8s-operator/issues
 website:
@@ -23,6 +23,8 @@ containers:
         location: /var/lib/connect/plugins
 
 peers:
+  restart:
+    interface: rolling_op
   worker:
     interface: worker
   upgrade:

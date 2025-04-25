@@ -22,7 +22,6 @@ from literals import (
     CONFIG_DIR,
     GROUP,
     JMX_EXPORTER_PORT,
-    LOG_SENSITIVE_OUTPUT,
     SERVICE_NAME,
     USER,
 )
@@ -50,10 +49,11 @@ class Workload(WorkloadBase):
     """Wrapper for performing common operations specific to the Kafka Connect Container."""
 
     service: str = SERVICE_NAME
+    paths = K8sPaths(CONFIG_DIR)
 
-    def __init__(self, container: Container) -> None:
+    def __init__(self, container: Container, profile: str = "production") -> None:
         self.container = container
-        self.paths = K8sPaths(CONFIG_DIR)
+        self.log_sensitive_output = profile == "testing"
 
     @override
     def start(self) -> None:
@@ -88,9 +88,9 @@ class Workload(WorkloadBase):
         command: list[str] | str,
         env: dict[str, str] | None = None,
         working_dir: str | None = None,
-        sensitive: bool = False,
+        sensitive: bool = True,
     ) -> str:
-        should_log = not sensitive or LOG_SENSITIVE_OUTPUT
+        should_log = not sensitive or self.log_sensitive_output
         command = command if isinstance(command, list) else [command]
         try:
             process = self.container.exec(

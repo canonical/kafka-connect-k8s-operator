@@ -52,6 +52,16 @@ class CommandResult:
     stderr: str
 
 
+@dataclass
+class DatabaseFixtureParams:
+    """Data model for database test data fixture requests."""
+
+    app_name: str
+    db_name: str
+    no_tables: int = 1
+    no_records: int = 1000
+
+
 def check_socket(host: str | None, port: int) -> bool:
     """Checks whether IPv4 socket is up or not."""
     if host is None:
@@ -269,3 +279,25 @@ async def self_signed_ca(ops_test: OpsTest, app_name: str):
         ca_file.write(ca)
         ca_file.close()
         yield ca_file
+
+
+async def destroy_active_workers(ops_test: OpsTest):
+    status_resp = await make_connect_api_request(ops_test, endpoint="connectors?expand=status")
+
+    workers = {
+        item["status"]["connector"]["worker_id"].split(":")[0]
+        for item in status_resp.json().values()
+    }
+
+    pods = {worker.split(".")[0] for worker in workers}
+    for pod in pods:
+        delete_pod(ops_test, pod)
+
+
+def delete_pod(ops_test: OpsTest, pod_name: str):
+    check_output(
+        f"kubectl delete pod {pod_name} -n {ops_test.model.info.name}",
+        stderr=PIPE,
+        shell=True,
+        universal_newlines=True,
+    )

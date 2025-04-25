@@ -7,8 +7,10 @@
 import logging
 from typing import TYPE_CHECKING
 
+from charms.data_platform_libs.v0.data_interfaces import PLUGIN_URL_NOT_REQUIRED
 from ops.charm import (
     ConfigChangedEvent,
+    UpdateStatusEvent,
 )
 from ops.framework import EventBase, Object
 
@@ -39,19 +41,19 @@ class ConnectHandler(Object):
 
         # instantiate the provider
         self.provider = ConnectProvider(self.charm)
-        self.framework.observe(self.charm.on[PEER_REL].relation_changed, self._on_config_changed)
 
     def _update_status(self, event: EventBase) -> None:
         """Handler for `update-status` event."""
         if self.charm.connect_manager.health_check():
             self.charm._set_status(Status.ACTIVE)
             self.charm.unit.set_ports(self.context.rest_port)
+            logger.info(f"Connector(s) Status: {self.charm.connect_manager.connectors}")
         elif self.context.ready:
             self.charm._set_status(Status.SERVICE_NOT_RUNNING)
         else:
             self.charm._set_status(self.context.status)
 
-        if isinstance(event, ConfigChangedEvent):
+        if not isinstance(event, UpdateStatusEvent):
             return
 
         # for plugins update if needed
@@ -97,7 +99,10 @@ class ConnectHandler(Object):
                 )
                 continue
 
-            if client.username not in loaded_plugins:
+            if (
+                client.username not in loaded_plugins
+                and client.plugin_url != PLUGIN_URL_NOT_REQUIRED
+            ):
                 continue
 
             if set(client.endpoints.split(",")) == set(self.context.rest_endpoints.split(",")):
@@ -121,7 +126,7 @@ class ConnectHandler(Object):
         update_set = set()
 
         for client in self.context.clients.values():
-            if client.username in loaded_clients:
+            if client.username in loaded_clients or client.plugin_url == PLUGIN_URL_NOT_REQUIRED:
                 continue
 
             try:
