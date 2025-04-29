@@ -183,7 +183,7 @@ micro  admin/cos.prometheus  admin   prometheus_scrape:metrics-endpoint
 . . .
 ```
 
-Now, integrate Kakfa Connect application with the `metrics-endpoint`, `grafana-dashboard` and `logging` relations:
+Now, integrate Kafka Connect application with the `metrics-endpoint`, `grafana-dashboard` and `logging` relations:
 
 ```shell
 juju relate micro:admin/cos.prometheus kafka-connect-k8s
