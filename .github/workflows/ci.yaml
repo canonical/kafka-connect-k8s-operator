@@ -99,7 +99,31 @@ jobs:
             echo "mark_expression=not unstable" >> $GITHUB_OUTPUT
           fi
       - name: Run integration tests
-        run: tox run -e ${{ matrix.tox-environments }} -- -m '${{ steps.select-tests.outputs.mark_expression }}'
+        id: run-tests
+        run: tox run -e ${{ matrix.tox-environments }} -- -m '${{ steps.select-tests.outputs.mark_expression }}' --model testing --keep-models
         env:
           CI_PACKED_CHARMS: ${{ needs.build.outputs.charms }}
+      - name: Select model
+        timeout-minutes: 1
+        if: ${{ (success() || (failure() && steps.run-tests.outcome == 'failure')) }}
+        id: juju-switch
+        run: |
+          juju switch testing
+          mkdir ~/logs/
+      - name: juju status
+        timeout-minutes: 1
+        if: ${{ (success() || (failure() && steps.run-tests.outcome == 'failure')) }}
+        run: juju status --color --relations | tee ~/logs/juju-status.txt
+      - name: juju debug-log
+        timeout-minutes: 3
+        if: ${{ (success() || (failure() && steps.run-tests.outcome == 'failure')) }}
+        run: juju debug-log --color --replay --no-tail | tee ~/logs/juju-debug-log.txt
+      - name: Upload logs
+        timeout-minutes: 5
+        if: ${{ (success() || (failure() && steps.run-tests.outcome == 'failure')) }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: logs-integration-test-${{ matrix.job.artifact }}
+          path: ~/logs/
+          if-no-files-found: error
 
