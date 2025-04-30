@@ -9,7 +9,7 @@ This operator can be found on [Charmhub](https://charmhub.io/kafka-connect) and 
 
 - Automated or manual connector plugins management.
 - Fault-tolerance, replication and scalability out of the box.
-- Authenticaon on REST API enabled by default.
+- Authentication on REST API enabled by default.
 - TLS support both on the REST API and Apache Kafka cluster relations.
 - Seamless integration with Charmed Apache Kafka set of operators
 - Seamless integration with an ecosystem of of Integrator charms supporting common ETL tasks on different database technologies offered by [Canonical Data Platform](https://canonical.com/data).
