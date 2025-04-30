@@ -23,13 +23,13 @@ Since Kafka Connect requires a running Apache Kafka cluster, this charmed operat
 Before using Charmed Kafka Connect, an Apache Kafka cluster needs to be deployed. The Charmed Apache Kafka K8s operator can be deployed as follows:
 
 ```bash
-juju deploy kafka-k8s --channel 3/edge -n 3 --config roles="broker,controller"
+juju deploy kafka-k8s --channel 3/edge -n 3 --config roles="broker,controller" --trust
 ```
 
 To deploy the Charmed Kafka Connect K8s operator and relate it with the Apache Kafka cluster, use the following commands:
 
 ```bash
-juju deploy kafka-connect-k8s --channel latest/edge
+juju deploy kafka-connect-k8s --channel latest/edge --trust
 juju integrate kafka-connect-k8s kafka-k8s
 ```
 
