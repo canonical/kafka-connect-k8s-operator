@@ -22,15 +22,15 @@ Since Kafka Connect requires a running Apache Kafka cluster, this charmed operat
 
 Before using Charmed Kafka Connect, an Apache Kafka cluster needs to be deployed. The Charmed Apache Kafka K8s operator can be deployed as follows:
 
-```shell
-$ juju deploy kafka-k8s --channel 3/edge -n 3 --config roles="broker,controller"
+```bash
+juju deploy kafka-k8s --channel 3/edge -n 3 --config roles="broker,controller"
 ```
 
 To deploy the Charmed Kafka Connect K8s operator and relate it with the Apache Kafka cluster, use the following commands:
 
-```shell
-$ juju deploy kafka-connect-k8s --channel latest/edge
-$ juju integrate kafka-connect-k8s kafka-k8s
+```bash
+juju deploy kafka-connect-k8s --channel latest/edge
+juju integrate kafka-connect-k8s kafka-k8s
 ```
 
 To watch the process, `juju status` can be used. Once all the units show as `active|idle`, the Kafka Connect cluster is ready to be used.
@@ -41,7 +41,7 @@ Kafka Connect uses a pluggable architecture model, meaning that the user could a
 
 In the Charmed Kafka Connect K8s operator, adding a plugin is as simple as calling the `juju attach-resource` command. Make sure that you bundle all required JAR files into a single TAR archive (for example, `my-plugin.tar`) and then use the following command:
 
-```shell
+```bash
 juju attach-resource kafka-connect-k8s connect-plugin=./my-plugin.tar
 ```
 
@@ -67,7 +67,7 @@ juju add-secret mysecret admin=adminpass
 
 You will receive a secret-id in response which looks like: 
 
-```bash
+```text
 secret:cvh7kruupa1s46bqvuig
 ```
 
@@ -164,13 +164,13 @@ Deploy `cos-lite` bundle in a Kubernetes environment. This can be done by follow
 
 Once COS is deployed, we can find the offers from the Kafka Connect model. To do that, switch back to that model:
 
-```shell
+```bash
 juju switch <kafka_connect_model_name>
 ```
 
 And use the `find-offers` command:
 
-```shell
+```bash
 juju find-offers <k8s_controller_name>:
 ```
 
@@ -185,10 +185,10 @@ micro  admin/cos.prometheus  admin   prometheus_scrape:metrics-endpoint
 
 Now, integrate Kafka Connect application with the `metrics-endpoint`, `grafana-dashboard` and `logging` relations:
 
-```shell
-juju relate micro:admin/cos.prometheus kafka-connect-k8s
-juju relate micro:admin/cos.grafana kafka-connect-k8s
-juju relate micro:admin/cos.loki kafka-connect-k8s
+```bash
+juju integrate micro:admin/cos.prometheus kafka-connect-k8s
+juju integrate micro:admin/cos.grafana kafka-connect-k8s
+juju integrate micro:admin/cos.loki kafka-connect-k8s
 ```
 
 After this is complete, Grafana will show a new dashboard: `Kafka Connect Cluster`.
