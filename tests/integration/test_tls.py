@@ -42,7 +42,6 @@ async def test_deploy_tls(ops_test: OpsTest, kafka_connect_charm):
             channel=KAFKA_CHANNEL,
             application_name=KAFKA_APP,
             num_units=1,
-            series="jammy",
             config={"roles": "broker,controller"},
         ),
     )

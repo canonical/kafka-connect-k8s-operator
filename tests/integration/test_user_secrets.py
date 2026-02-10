@@ -37,7 +37,6 @@ async def test_build_and_deploy(ops_test: OpsTest, kafka_connect_charm):
                 PLUGIN_RESOURCE_KEY: "./tests/integration/resources/FakeResource.tar",
             },
             num_units=1,
-            series="jammy",
             config={"profile": "testing"},
         ),
         ops_test.model.deploy(
@@ -45,7 +44,6 @@ async def test_build_and_deploy(ops_test: OpsTest, kafka_connect_charm):
             channel=KAFKA_CHANNEL,
             application_name=KAFKA_APP,
             num_units=1,
-            series="jammy",
             config={"roles": "broker,controller"},
         ),
     )
