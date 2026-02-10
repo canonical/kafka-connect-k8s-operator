@@ -233,7 +233,7 @@ class Workload(WorkloadBase):
                     "group": GROUP,
                     "environment": {
                         "KAFKA_OPTS": " ".join(extra_opts),
-                        "JAVA_HOME": "/usr/lib/jvm/java-18-openjdk-amd64",
+                        "JAVA_HOME": "/usr/lib/jvm/java-21-openjdk-amd64",
                         "LOG_DIR": self.paths.logs_dir,
                     },
                 }
