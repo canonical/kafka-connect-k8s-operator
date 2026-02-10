@@ -55,6 +55,7 @@ parts:
       - libffi-dev  # Needed to build Python dependencies with Rust from source
       - libssl-dev  # Needed to build Python dependencies with Rust from source
       - pkg-config  # Needed to build Python dependencies with Rust from source
+      - rustup
       - git
     override-build: |
       rustup default 1.92.0  # renovate: charmcraft-rust-latest
