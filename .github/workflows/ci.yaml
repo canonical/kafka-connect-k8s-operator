@@ -65,7 +65,8 @@ jobs:
           - integration-provider
           - integration-scaling
           - integration-secrets
-          - integration-upgrade
+          # FIXME: re-enable after new base is released
+          # - integration-upgrade
     name: ${{ matrix.tox-environments }}
     needs:
       - lint
