@@ -71,15 +71,13 @@ jobs:
       - lint
       - unit-test
       - build
-    runs-on: ubuntu-latest
+    runs-on: self-hosted-linux-amd64-noble-medium
     timeout-minutes: 240
     steps:
       - name: Checkout
         uses: actions/checkout@v4
       - name: Setup operator environment
         run: |
-          sudo apt-get remove -y docker-ce docker-ce-cli containerd.io
-          sudo rm -rf /run/containerd
           sudo snap install concierge --classic
           sudo concierge prepare --trace --extra-debs pipx
       - name: Install dependencies
