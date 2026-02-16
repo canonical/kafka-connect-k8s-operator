@@ -77,11 +77,15 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
       - name: Setup operator environment
-        uses: charmed-kubernetes/actions-operator@main
-        with:
-          provider: microk8s
-          channel: "1.28-strict/stable"
-          juju-channel: 3.6/stable
+        run: |
+          sudo apt-get remove -y docker-ce docker-ce-cli containerd.io
+          sudo rm -rf /run/containerd
+          sudo snap install concierge --classic
+          sudo concierge prepare --trace --extra-debs pipx
+      - name: Install dependencies
+        run: |
+          pipx install tox
+          pipx ensurepath
       - name: Download packed charm(s)
         uses: actions/download-artifact@v4
         with:
