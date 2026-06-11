@@ -2,7 +2,6 @@
 # Copyright 2025 Canonical Ltd.
 # See LICENSE file for licensing details.
 
-from collections import defaultdict
 from pathlib import Path
 from unittest.mock import MagicMock, Mock, patch
 
@@ -18,7 +17,6 @@ from src.literals import (
     PEER_REL,
     PLUGIN_RESOURCE_KEY,
     SERVICE_NAME,
-    SNAP_NAME,
     SUBSTRATE,
 )
 
@@ -59,17 +57,6 @@ def workload_with_io(monkeypatch, tmp_path_factory):
     )
     monkeypatch.setattr("workload.Workload.paths", paths)
     yield
-
-
-@pytest.fixture(autouse=True)
-def patched_snap(monkeypatch):
-    cache = Mock()
-    snap_mock = Mock()
-    snap_mock.services = defaultdict(default_factory=lambda _: {"active": True})
-    cache.return_value = {SNAP_NAME: snap_mock}
-    with monkeypatch.context() as m:
-        m.setattr("charms.operator_libs_linux.v2.snap.SnapCache", cache)
-        yield
 
 
 @pytest.fixture(autouse=True)
