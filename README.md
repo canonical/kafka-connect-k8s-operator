@@ -22,13 +22,13 @@ Since Kafka Connect requires a running Apache Kafka cluster, this charmed operat
 
 Before using Charmed Kafka Connect, an Apache Kafka cluster needs to be deployed. The Charmed Apache Kafka K8s operator can be deployed as follows:
 
-```bash
+```shell
 juju deploy kafka-k8s --channel 3/edge -n 3 --config roles="broker,controller" --trust
 ```
 
 To deploy the Charmed Kafka Connect K8s operator and relate it with the Apache Kafka cluster, use the following commands:
 
-```bash
+```shell
 juju deploy kafka-connect-k8s --channel latest/edge --trust
 juju integrate kafka-connect-k8s kafka-k8s
 ```
@@ -41,7 +41,7 @@ Kafka Connect uses a pluggable architecture model, meaning that the user could a
 
 In the Charmed Kafka Connect K8s operator, adding a plugin is as simple as calling the `juju attach-resource` command. Make sure that you bundle all required JAR files into a single TAR archive (for example, `my-plugin.tar`) and then use the following command:
 
-```bash
+```shell
 juju attach-resource kafka-connect-k8s connect-plugin=./my-plugin.tar
 ```
 
@@ -61,7 +61,7 @@ The complete flow for defining custom credentials for the Charmed Kafka Connect 
 
 Add a user secret defining the internal `admin` user's password:
 
-```bash
+```shell
 juju add-secret mysecret admin=adminpass
 ```
 
@@ -73,25 +73,25 @@ secret:cvh7kruupa1s46bqvuig
 
 Then, grant access to the secret with:
 
-```bash
+```shell
 juju grant-secret mysecret kafka-connect-k8s
 ```
 
 Finally, configure the Kafka Connect application to use the provided secret:
 
-```bash
+```shell
 juju config kafka-connect-k8s system-users=secret:cvh7kruupa1s46bqvuig
 ```
 
 To verify that Kafka Connect is properly configured and functioning, send a request to the REST interface listing all registered connectors using the password set in Juju secret:
 
-```bash
+```shell
 curl -u admin:adminpass -X GET http://<kafka-connect-k8s-unit-ip>:8083/connector-plugins
 ```
 
 You should get a response like below:
 
-```bash
+```shell
 [
   {
     "class": "org.apache.kafka.connect.mirror.MirrorCheckpointConnector",
@@ -133,20 +133,20 @@ Note that TLS can be enabled in three different modes:
 
 To enable TLS on the Kafka Connect REST interface, first deploy the TLS charm and relate it to the Charmed Kafka Connect application:
 
-```bash
+```shell
 juju deploy self-signed-certificates
 juju integrate self-signed-certificates kafka-connect-k8s
 ```
 
 To enable TLS on the relation between the Apache Kafka and Kafka Connect clusters: 
 
-```bash
+```shell
 juju integrate self-signed-certificates kafka-k8s
 ```
 
 To disable TLS on each interface, remove their respective relations:
 
-```bash
+```shell
 juju remove-relation kafka-connect-k8s self-signed-certificates
 juju remove-relation kafka-k8s self-signed-certificates
 ```
@@ -164,13 +164,13 @@ Deploy `cos-lite` bundle in a Kubernetes environment. This can be done by follow
 
 Once COS is deployed, we can find the offers from the Kafka Connect model. To do that, switch back to that model:
 
-```bash
+```shell
 juju switch <kafka_connect_model_name>
 ```
 
 And use the `find-offers` command:
 
-```bash
+```shell
 juju find-offers <k8s_controller_name>:
 ```
 
@@ -183,12 +183,22 @@ micro  admin/cos.prometheus  admin   prometheus_scrape:metrics-endpoint
 . . .
 ```
 
-Now, integrate Kafka Connect application with the `metrics-endpoint`, `grafana-dashboard` and `logging` relations:
+Now, deploy `Opentelemetry Collector` and integrate it with Kafka Connect:
 
-```bash
-juju integrate micro:admin/cos.prometheus kafka-connect-k8s
-juju integrate micro:admin/cos.grafana kafka-connect-k8s
-juju integrate micro:admin/cos.loki kafka-connect-k8s
+```shell
+juju deploy opentelemetry-collector-k8s --trust
+
+juju integrate kafka-connect-k8s:metrics-endpoint opentelemetry-collector-k8s
+juju integrate kafka-connect-k8s:grafana-dashboard opentelemetry-collector-k8s
+juju integrate kafka-connect-k8s:logging opentelemetry-collector-k8s
+```
+
+Finally, integrate `opentelemetry-collector` with COS offers:
+
+```shell
+juju integrate micro:admin/cos.prometheus opentelemetry-collector-k8s
+juju integrate micro:admin/cos.grafana opentelemetry-collector-k8s
+juju integrate micro:admin/cos.loki opentelemetry-collector-k8s
 ```
 
 After this is complete, Grafana will show a new dashboard: `Kafka Connect Cluster`.
