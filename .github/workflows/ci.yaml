@@ -51,8 +51,21 @@ jobs:
     strategy:
       matrix:
         path:
-          - .
           - tests/integration/app-charm/
+
+  build-from-monorepo:
+    name: Build charms
+    uses: ./.github/workflows/_build_charm_dev.yaml
+    with:
+      charmcraft-snap-channel: latest/stable
+      path-to-charm-directory: ${{ matrix.path }}
+    strategy:
+      matrix:
+        path:
+          - connect_k8s
+    permissions:
+      actions: read
+      contents: read
 
   integration-test:
     strategy:
@@ -72,6 +85,7 @@ jobs:
       - lint
       - unit-test
       - build
+      - build-from-monorepo
     runs-on: self-hosted-linux-amd64-noble-medium
     timeout-minutes: 240
     steps:
@@ -93,6 +107,7 @@ jobs:
       - name: Select tests
         id: select-tests
         run: |
+          cp connect_k8s/*.charm .
           if [ "${{ github.event_name }}" == "schedule" ]
           then
             echo Running unstable and stable tests
@@ -102,7 +117,9 @@ jobs:
             echo "mark_expression=not unstable" >> $GITHUB_OUTPUT
           fi
       - name: Run integration tests
-        run: tox run -e ${{ matrix.tox-environments }} -- -m '${{ steps.select-tests.outputs.mark_expression }}'
+        run: tox run -e ${{ matrix.tox-environments }} -- -m '${{ steps.select-tests.outputs.mark_expression }}' --keep-models
         env:
           CI_PACKED_CHARMS: ${{ needs.build.outputs.charms }}
-
+      - name: Juju debug logs
+        if: ${{ always() }}
+        run: juju debug-log --color --replay --no-tail
