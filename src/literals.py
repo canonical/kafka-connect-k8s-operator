@@ -81,6 +81,7 @@ class Status(Enum):
         WaitingStatus("Waiting for Kafka cluster credentials"), "DEBUG"
     )
     SERVICE_NOT_RUNNING = StatusLevel(BlockedStatus("Worker service is not running"), "WARNING")
+    NO_CERT = StatusLevel(WaitingStatus("unit waiting for signed certificates"), "INFO")
 
     ACTIVE = StatusLevel(ActiveStatus(), "DEBUG")
 

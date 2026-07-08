@@ -89,6 +89,7 @@ class Workload(WorkloadBase):
         env: dict[str, str] | None = None,
         working_dir: str | None = None,
         sensitive: bool = True,
+        log_on_error: bool = True,
     ) -> str:
         should_log = not sensitive or self.log_sensitive_output
         command = command if isinstance(command, list) else [command]
@@ -102,7 +103,7 @@ class Workload(WorkloadBase):
             output, _ = process.wait_output()
             return output
         except pebble.ExecError as e:
-            if should_log:
+            if should_log and log_on_error:
                 logger.debug(e)
             raise e
 

@@ -2,6 +2,7 @@
 # Copyright 2025 Canonical Ltd.
 # See LICENSE file for licensing details.
 import json
+import logging
 import re
 import socket
 import ssl
@@ -9,7 +10,7 @@ import tempfile
 from contextlib import closing, contextmanager
 from dataclasses import dataclass
 from pathlib import Path
-from subprocess import PIPE, check_output
+from subprocess import PIPE, CalledProcessError, check_output
 from typing import cast
 
 import requests
@@ -25,6 +26,8 @@ from requests.auth import HTTPBasicAuth
 
 from core.models import PeerWorkersContext
 from literals import CONFIG_DIR, DEFAULT_API_PORT
+
+logger = logging.getLogger(__name__)
 
 METADATA = yaml.safe_load(Path("./metadata.yaml").read_text())
 APP_NAME = METADATA["name"]
@@ -300,3 +303,86 @@ def delete_pod(juju: JujuFixture, pod_name: str):
         shell=True,
         universal_newlines=True,
     )
+
+
+def sign_manual_certs(
+    tmp_path: Path, model: str, manual_app: str = "manual-tls-certificates"
+) -> str:
+    """Sign CSRs using a generated CA, return the path to the CA file."""
+    csrs_cmd = [
+        f"JUJU_MODEL={model}",
+        "juju",
+        "run",
+        f"{manual_app}/0",
+        "get-outstanding-certificate-requests",
+        "--format=json",
+    ]
+    csrs = check_output(" ".join(csrs_cmd), stderr=PIPE, universal_newlines=True, shell=True)
+    res = json.loads(csrs)[f"{manual_app}/0"]["results"]["result"]
+    csr_list = [i["csr"] for i in json.loads(res)]
+
+    # Generate a CA
+    generate_ca_cmd = [
+        "openssl",
+        "req",
+        "-new",
+        "-x509",
+        "-nodes",
+        "-newkey rsa:2048",
+        "-keyout ca.key",
+        "-out ca.pem",
+        "-days 365",
+        '-subj "/CN=TestCA"',
+        '-addext "basicConstraints=critical,CA:TRUE"',
+        '-addext "keyUsage=critical,keyCertSign,cRLSign"',
+        '-addext "subjectKeyIdentifier=hash"',
+    ]
+    check_output(
+        " ".join(generate_ca_cmd), stderr=PIPE, universal_newlines=True, shell=True, cwd=tmp_path
+    )
+
+    for i, csr in enumerate(csr_list):
+        if not csr:
+            continue
+
+        tmp_dir = Path(tmp_path)
+        csr_file = tmp_dir / f"csr{i}"
+        csr_file.write_text(csr)
+
+        cert_file = tmp_dir / f"{i}.pem"
+
+        try:
+            sign_cmd = [
+                "openssl",
+                "x509",
+                "-req",
+                f"-in {csr_file}",
+                f"-CAkey {tmp_path}/ca.key",
+                f"-CA {tmp_path}/ca.pem",
+                "-days 100",
+                "-CAcreateserial",
+                f"-out {cert_file}",
+                "-copy_extensions",
+                "copyall",
+            ]
+            provide_cmd = [
+                f"JUJU_MODEL={model}",
+                "juju",
+                "run",
+                f"{manual_app}/0",
+                "provide-certificate",
+                f'ca-certificate="$(base64 -w0 {tmp_path}/ca.pem)"',
+                f'certificate="$(base64 -w0 {cert_file})"',
+                f'certificate-signing-request="$(base64 -w0 {csr_file})"',
+            ]
+
+            check_output(" ".join(sign_cmd), stderr=PIPE, universal_newlines=True, shell=True)
+            response = check_output(
+                " ".join(provide_cmd), stderr=PIPE, universal_newlines=True, shell=True
+            )
+            logger.info(f"{response=}")
+        except CalledProcessError as e:
+            logger.error(f"{e.stdout=}, {e.stderr=}, {e.output=}")
+            raise e
+
+    return f"{tmp_path}/ca.pem"
